@@ -52,9 +52,14 @@ Read packet from input file and pretty print Ethernet header.
     Options (if IHL > 5)
 """
     
-    
+MAC_ADDR_SIZE = 12  #6bytes
+TPID_SIZE = 4  #2bytes
+ETHER_TYPE_SIZE = 4 #2bytes
+IP_VERSION_SIZE = 1  #4bits
 etherType = {}
 l2Type = None
+length = 0
+offset = 0
 
 class Ethernet:
   def __init__(self):  # Constructor
@@ -89,26 +94,40 @@ def main():
     data = file.read().replace('\n', ' ').replace(' ', '')
   parseL2(data)
   parseL3(data)
-  parseL4(data)
-  parseL5(data)
+  #parseL4(data)
+  #parseL5(data)
+
+def getField(data):
+  global offset, length
+  res = data[offset: offset + length]
+  offset += length
+  return res
 
 def parseL2(data):
-  print ("DST MAC: " + printMAC(data[:12]))
-  print ("SRC MAC: " + printMAC(data[12:24]))
-  isVLANTagged = data[24:28] == "8100"    #XXX: remove hard code
+  global length, offset, l2Type
+  offset = 0
+  length = MAC_ADDR_SIZE
+  print ("DST MAC: " + printMAC(data, offset, length))
+  offset += length
+  print ("SRC MAC: " + printMAC(data, offset, length))
+  offset += length
+  length = TPID_SIZE
+  isVLANTagged = data[offset: offset + length] == "8100"
+  length = ETHER_TYPE_SIZE
   if isVLANTagged is True:
-    print ("type: " + etherType[data[32:36]])
-    global l2Type
-    l2Type = etherType[data[32:36]]
+    offset += VLAN_HEADER_SIZE
+    l2Type = etherType[data[offset:offset + length]]
   else:
-    print ("type: " + etherType[data[24:28]])
-    global l2Type
-    l2Type = etherType[data[24:28]]
+    l2Type = etherType[data[offset: offset + length]]
+  print ("type: " + l2Type)
+  offset += length
 
 def parseIPv4(data):
+  global length, offset
   print ("Parsing IPv4 header")
   ip = IPv4()
-  print (type(ip))
+  length = IP_VERSION_SIZE
+  ip.version = getField(data)
   attrs = vars(ip)
   print ('\n '.join("%s: %s" % item for item in attrs.items()))
 
